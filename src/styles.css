@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+@layer components {
+    .glass-panel {
+        @apply bg-white/30 backdrop-blur-md rounded-lg shadow-md border border-black/5;
+    }
+
+    .header-btn {
+        @apply p-2.5 rounded-lg bg-transparent border-none text-gray-700 
+           hover:bg-black/5 transition-all cursor-pointer text-xl active:scale-95;
+    }
+}

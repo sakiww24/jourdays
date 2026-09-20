@@ -1,27 +1,139 @@
 <template>
-  <div class="schedule-container">
+  <div class="flex flex-col flex-1 min-h-0 w-full h-full overflow-auto p-0 box-border">
+    
     <!-- 顶部毛玻璃标题栏 -->
-    <header class="app-navbar">
-      <div class="navbar-left">
-        <button class="icon-btn menu-btn">☰</button>
+    <header class="flex self-stretch bg-white/45 backdrop-blur-[15px] border-b border-black/5 rounded-xl z-[100] py-2 px-4 items-center justify-between touch-action-none">
+      
+      <div class="flex items-center gap-1">
+        <button class="header-btn" @click="popupMenu">
+          <svg width="24" height="24" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.94971 11.9497H39.9497" stroke="#333" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.94971 23.9497H39.9497" stroke="#333" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.94971 35.9497H39.9497" stroke="#333" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
       </div>
-      <div class="navbar-middle">
+
+      <div class="flex items-center gap-1 text-[22px] font-bold text-gray-800">
         {{ titleCurrentMonth }}月
-        <button class="icon-btn last-week-btn" @click="switchWeekOrDay(-1)">&lt;</button>
+        <button class="header-btn" @click="switchWeekOrDay(-1)">&lt;</button>
         第{{ titleCurrentWeek }}周
-        <button class="icon-btn next-week-btn" @click="switchWeekOrDay(1)">&gt;</button>
+        <button class="header-btn" @click="switchWeekOrDay(1)">&gt;</button>
       </div>
-      <div class="navbar-right">
-        <button class="icon-btn today-btn" @click="goToday">今</button>
-        <button class="icon-btn view-switcher" @click="toggleView">{{ currentView == 'timeGridWeek' ? '日视图' : '周视图' }}</button>
-        <button class="icon-btn add-btn">+</button>
+
+      <div class="flex items-center gap-1">
+        <button class="header-btn text-[16px]" @click="goToday">今</button>
+        <button class="header-btn text-[16px]" @click="toggleView">{{ currentView == 'timeGridWeek' ? '日' : '周' }}</button>
+        <button class="header-btn" @click="triggerAddEvent">
+          <svg width="24" height="24" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44Z" fill="none" stroke="#333" stroke-width="4" stroke-linejoin="round"/><path d="M24 16V32" stroke="#333" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 24L32 24" stroke="#333" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
       </div>
+
     </header>
+
     <!-- 引入 FullCalendar 组件 -->
     <div ref="calendarWrap" class="calendar-wrap">
       <FullCalendar ref="calendarRef" :options="calendarOptions" />
     </div>
+
   </div>
+
+  <van-popup
+    v-model:show="showAddEvent"
+    position="bottom"
+    round
+    teleport="body"
+    close-on-click-overlay
+    :style="{ maxHeight: '82%' }"
+  >
+    <div class="p-4 pb-[calc(16px+env(safe-area-inset-bottom))]">
+      <div class="text-lg font-bold mb-3">添加日程</div>
+
+      <!-- 日程类型 -->
+      <div class="mb-3">
+        <div class="text-sm text-gray-500 mb-2">类型</div>
+        <div class="grid grid-cols-3 gap-2">
+          <button
+            v-for="t in eventTypes"
+            :key="t.value"
+            class="type-btn"
+            :class="{ active: form.type === t.value }"
+            @click="form.type = t.value"
+          >
+            {{ t.label }}
+          </button>
+        </div>
+      </div>
+
+      <van-field
+        v-model="form.title"
+        label="标题"
+        placeholder="例如：高数课程"
+        required
+        clearable
+      />
+
+      <van-field label="日期">
+        <template #input>
+          <input
+            v-model="form.date"
+            type="date"
+            class="w-full bg-transparent outline-none"
+          >
+        </template>
+      </van-field>
+
+      <!-- 时间段：开始 + 结束 -->
+      <div v-if="form.type === 'range'" class="grid grid-cols-2 gap-2 px-4 py-2">
+        <div>
+          <div class="text-xs text-gray-400 mb-1">开始</div>
+          <input v-model="form.startTime" type="time" class="time-input">
+        </div>
+        <div>
+          <div class="text-xs text-gray-400 mb-1">结束</div>
+          <input v-model="form.endTime" type="time" class="time-input">
+        </div>
+      </div>
+
+      <!-- 时间点：只选一个时间 -->
+      <div v-else-if="form.type === 'point'" class="px-4 py-2">
+        <div class="text-xs text-gray-400 mb-1">时间</div>
+        <input v-model="form.startTime" type="time" class="time-input">
+      </div>
+
+      <!-- 全天：不显示时间输入 -->
+      <div v-else class="px-4 py-2 text-sm text-gray-400">
+        全天日程只需选择日期
+      </div>
+
+      <!-- 颜色 -->
+      <div class="px-4 py-2">
+        <div class="text-sm text-gray-500 mb-2">颜色</div>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="c in eventColors"
+            :key="c"
+            class="h-8 w-8 rounded-full border"
+            :style="{
+              background: c,
+              borderColor: form.color === c ? '#333' : 'rgba(0,0,0,0.08)'
+            }"
+            @click="form.color = c"
+          />
+        </div>
+      </div>
+
+      <van-field v-model="form.location" label="地点" placeholder="可选" clearable />
+      <van-field
+        v-model="form.description"
+        label="备注"
+        type="textarea"
+        rows="2"
+        placeholder="可选"
+      />
+
+      <div class="flex gap-2 mt-4">
+        <van-button round block @click="showAddEvent = false">取消</van-button>
+        <van-button round block type="primary" @click="submitEvent">保存</van-button>
+      </div>
+    </div>
+  </van-popup>
 </template>
 
 
@@ -51,6 +163,7 @@ const toggleView = () => {
   switchView(newView);
 };
 
+// 日历配置
 const calendarOptions = reactive({
   /* 日历全局设置 */
   plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
@@ -98,24 +211,17 @@ const calendarOptions = reactive({
 
   // 点击事件卡片主逻辑
   eventClick: (info) => {
-    // 预留卡片详情展示
-    alert(`点击了事件：${info.event.title}`);
+    // 弹出一个详情框
+    
   },
   
-  // 模拟数据：展示层级堆叠效果
-  events: [
-    { title: '高数课程', start: new Date().setHours(9, 0), end: new Date().setHours(11, 30), backgroundColor: 'rgba(22, 119, 255, 0.8)' },
-    { title: '小组讨论', start: new Date().setHours(10, 0), end: new Date().setHours(11, 0), backgroundColor: 'rgba(255, 133, 192, 0.8)' }, // 与高数重叠
-    { title: '健身', start: new Date().setHours(18, 0), end: new Date().setHours(19, 30), backgroundColor: 'rgba(82, 196, 26, 0.8)' },
-  ],
-  
   /* 日程卡片格式设置 */
-  // 允许日程块重叠显示
   eventOverlap: true,
-  // 卡片外观
   eventBorderColor: 'transparent', // 事件边框透明，避免遮挡重叠效果
-  // 卡片内容
   displayEventTime: false, // 仅显示标题，隐藏时间，避免视觉杂乱
+  // 时间点事件的设置
+  defaultTimedEventDuration: '00:25:00',
+  forceEventDuration: false,
 
   /* 表头语言与格式设置 */
   // 中文设置
@@ -123,7 +229,7 @@ const calendarOptions = reactive({
   // 列头格式设置
   dayHeaderContent: function(arg) {
     const weekdays = ['日', '一', '二', '三', '四', '五', '六']
-    return {html:`${weekdays[arg.date.getDay()]}<br>${arg.date.getDate()}`}
+    return {html:`<span class="text-[12px] font-normal">${weekdays[arg.date.getDay()]}</span><br><span class="text-[18px] font-normal">${arg.date.getDate()}</span>`}
   },
   // 行头格式设置
   slotLabelFormat: {
@@ -132,7 +238,6 @@ const calendarOptions = reactive({
     hour12: false
   },
 });
-
 
 // 实现时间轴缩放手势（待定）和左右滑动切换周手势
 let gesture = null; // 用于存储手势实例
@@ -246,23 +351,124 @@ const goToday = () => {
   api.scrollToTime(`${pad(now.getHours()-2)}:${pad(now.getMinutes())}:00`);
 };
 
+// 日程事件相关逻辑
+const showAddEvent = ref(false);
+const eventTypes = [
+  { label: '全天', value: 'allday' },
+  { label: '时间段', value: 'range' },
+  { label: '时间点', value: 'point' },
+]
+
+// 淡一点的颜色，适合毛玻璃卡片
+const eventColors = [
+  'rgba(22, 119, 255, 0.45)',
+  'rgba(255, 133, 192, 0.45)',
+  'rgba(82, 196, 26, 0.45)',
+  'rgba(250, 173, 20, 0.45)',
+  'rgba(114, 46, 209, 0.40)',
+  'rgba(19, 194, 194, 0.40)',
+]
+
+const pad = (n) => String(n).padStart(2, '0')
+
+function randomColor() {
+  return eventColors[Math.floor(Math.random() * eventColors.length)]
+}
+
+function defaultForm() {
+  const now = new Date()
+  const later = new Date(now.getTime() + 60 * 60 * 1000)
+
+  return {
+    title: '',
+    type: 'range', // allday | range | point
+    date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+    startTime: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+    endTime: `${pad(later.getHours())}:${pad(later.getMinutes())}`,
+    location: '',
+    description: '',
+    color: randomColor(), // 初始随机淡色
+  }
+}
+
+const form = ref(defaultForm())
+
+function submitEvent() {
+  if (!form.value.title.trim()) {
+    showToast?.('请填写标题')
+    return
+  }
+
+  const api = calendarRef.value?.getApi()
+  if (!api) return
+
+  const baseEvent = {
+    id: String(Date.now()),
+    title: form.value.title.trim(),
+    backgroundColor: form.value.color,
+    borderColor: 'transparent',
+    extendedProps: {
+      location: form.value.location,
+      description: form.value.description,
+      kind: form.value.type,
+    },
+  }
+
+  if (form.value.type === 'allday') {
+    api.addEvent({
+      ...baseEvent,
+      allDay: true,
+      start: form.value.date, // 全天建议用纯日期字符串
+    })
+  }
+
+  if (form.value.type === 'range') {
+    const start = new Date(`${form.value.date}T${form.value.startTime}:00`)
+    let end = new Date(`${form.value.date}T${form.value.endTime}:00`)
+
+    if (end <= start) {
+      showToast?.('结束时间需要晚于开始时间')
+      return
+    }
+
+    api.addEvent({
+      ...baseEvent,
+      allDay: false,
+      start,
+      end,
+    })
+  }
+
+  if (form.value.type === 'point') {
+    const start = new Date(`${form.value.date}T${form.value.startTime}:00`)
+
+    // FullCalendar 对零时长事件展示不稳定，所以时间点也给一个很短的可视时长
+    // 也可以做一个全局设置项
+    api.addEvent({
+      ...baseEvent,
+      allDay: false,
+      start,
+      // end: new Date(start.getTime() + 15 * 60 * 1000),
+      extendedProps: {
+        ...baseEvent.extendedProps,
+        pointTime: start.getTime(),
+      },
+    })
+  }
+
+  showAddEvent.value = false
+}
+
+function triggerAddEvent() {
+  form.value = defaultForm();
+  showAddEvent.value = true;
+}
+
 </script>
 
 
 <style scoped>
 
-.schedule-container {
-  /* 改用 flex 撑满，比 height:100% 更可靠 */
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0; /* 关键！允许 flex 子项收缩并触发内部滚动 */
-  width: 100%;
-  height: 100%;
-  overflow-y: auto;
-  padding: 0;
-  box-sizing: border-box;
-}
 .calendar-wrap {
   flex: 1;
   display: flex;
@@ -274,45 +480,6 @@ const goToday = () => {
 }
 :deep(.fc-scroller){
   touch-action: pan-x pan-y;
-}
-
-/* 导航栏主要样式 */
-.app-navbar {
-  display: flex;
-  background: rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(15px); 
-  -webkit-backdrop-filter: blur(15px); 
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05); 
-  border-radius: 8px;
-  z-index: 100;
-  padding: 12px 16px;
-  align-self: stretch;
-  align-items: center;
-  justify-content: space-between;
-}
-.navbar-middle { 
-  display: flex;
-  align-items: center;
-  font-size: 22px; 
-  font-weight: 600; 
-  color: #333; 
-}
-.navbar-left, .navbar-right { display: flex; align-items: center; }
-.icon-btn { 
-  border-radius: 8px;
-  background: none; 
-  border: none; 
-  padding: 4px 10px; 
-  color: #333; 
-}
-/* 适配不同按钮大小 */
-.menu-btn { font-size: 22px; }
-.navbar-middle .icon-btn { font-size: 24px; }
-.add-btn { font-size: 24px; }
-.view-switcher, .today-btn {
-  font-size: 16px;
-  font-weight: 500;
-  transition: all 0.2s ease;
 }
 
 /* ===== 覆盖 FullCalendar 默认样式，实现 iOS 毛玻璃风 ===== */
@@ -336,10 +503,12 @@ const goToday = () => {
   border: none;
   box-shadow: 0 4px 12px rgba(0,0,0,0.08);
   backdrop-filter: blur(8px); /* 卡片自身的毛玻璃效果 */
-  padding: 0px 3px;
-  font-size: 13px;
+  padding: 2px 3px;
+  font-size: 11px;
   font-weight: 500;
   opacity: 0.95;
+  color: black;
+  line-height: 1.4;
 }
 
 /* 处理重叠卡片的层级堆叠效果 */
